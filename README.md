@@ -81,12 +81,13 @@ volatility-forecasting/
 ## Reproducing the paper
 
 > **Note — the pipeline is now multi-market.** Every script takes `--market`
-> (`us`, `br_long`, `br_iv`) and writes to `data/<market>/` and
+> (`us`, `us_2018`, `br_long`, `br_iv`) and writes to `data/<market>/` and
 > `results/<market>/`. See [README_BR.md](README_BR.md) for the Brazilian
 > replication, and for two corrections to the model code that materially change
 > the US numbers below: with a proper validation split and a genuine
 > walk-forward GARCH forecast, the ensemble drops from 1st to 4th and
-> GJR-GARCH wins both subperiods.
+> GJR-GARCH wins both subperiods — while on a 2018–2022 evaluation window the
+> tree models win outright instead.
 >
 > The files under `data/` and `results/` at the repository root are the
 > original snapshot backing the tables in this README and the paper. They are

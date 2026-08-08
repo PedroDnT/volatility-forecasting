@@ -1,16 +1,20 @@
 # Arm A — Ibovespa, long sample, no implied volatility
 
-**Status: NOT YET POPULATED.** This directory is empty pending step 0.
+**Status: NOT YET POPULATED.** Blocked only on Yahoo access for `^BVSP`.
 
 ## What this arm is
 
-`^BVSP` (Ibovespa) daily OHLCV from Yahoo Finance, January 2004 to December
-2025, with the same feature construction as the US study minus the four
-implied-volatility features — because no Brazilian implied-volatility index
-exists before roughly 2011.
+`^BVSP` (Ibovespa) daily OHLCV from Yahoo Finance, January 2004 to April 2022,
+with the same feature construction as the US study minus the four
+implied-volatility features.
 
-The trade is deliberate. Arm A buys the full Brazilian regime sequence at the
-cost of the implied-vol block:
+It shares `br_iv`'s evaluation window (2018-01-01 → 2022-04-29) exactly, so the
+two differ only in training start and the presence of implied vol — which is
+what makes the pair a clean measurement of what implied vol is worth. The end
+date is inherited from IVol-BR; see `data/br_iv/PROVENANCE.md`.
+
+The trade is deliberate. This arm buys extra training history at the cost of
+the implied-vol block:
 
 | Episode | Why it matters |
 |---|---|
@@ -19,27 +23,27 @@ cost of the implied-vol block:
 | 2013 taper tantrum | Sharp EM-specific drawdown |
 | 2014–16 recession + Lava Jato | A prolonged domestic stress regime with no US analogue |
 | May 2017 "Joesley Day" | One-day −8.8%, two circuit breakers |
-| 2018 truckers' strike, election | |
-| March 2020 COVID | Six B3 circuit breakers |
+| 2018 truckers' strike, election | Sits inside the test window |
+| March 2020 COVID | Six B3 circuit breakers; sits inside the test window |
 | 2021–22 fiscal stress, election | Sits inside the test window |
 
-Arm B (`data/br_iv/`) makes the opposite trade. The two share the same
-validation and test windows, so their QLIKE numbers are computed over
-identical evaluation days and the A-vs-B difference isolates the value of the
-implied-vol features.
+`br_iv` makes the opposite trade: implied-vol features, but training only from
+August 2011.
 
 ## To populate
 
 ```bash
-python code/00_probe_sources.py                 # step 0, needs network
+python code/00_probe_sources.py                 # needs network
 python code/01_collect_data.py --market br_long
 ```
 
-## Step 0 — record findings here
+Blocked only on Yahoo access — nothing else is outstanding for this arm.
+
+## Open question — record findings here
 
 Run `code/00_probe_sources.py` on a machine with network access and fill in:
 
-- [ ] `^BVSP` first date, last date, row count for 2004-01-01 .. 2025-12-31
+- [ ] `^BVSP` first date, last date, row count for 2004-01-01 .. 2022-04-29
 - [ ] `^BVSP` volume zero/NaN rate, and the years where it is worst
 - [ ] Median trading days per calendar year
 
@@ -59,7 +63,7 @@ rather than in a log line. Feature count then drops from 26 to 24 for this arm.
 
 If volume turns out to matter, the alternative source is `BOVA11.SA`, the
 iShares Ibovespa ETF, which has genuine share volume — but it only starts in
-November 2008 and would forfeit this arm's whole reason for existing.
+November 2008 and would forfeit most of this arm's extra history.
 
 ## Notes on the Brazilian setting
 

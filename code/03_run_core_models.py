@@ -81,7 +81,7 @@ def fit_garch(returns: pd.Series, cfg: config.MarketConfig, legacy: bool,
 
     ann = np.sqrt(cfg.annualization)
     scaled = returns.dropna() * 100
-    test_index = scaled[cfg.test_start:].index
+    test_index = scaled[cfg.test_start:cfg.test_end].index
 
     out = {name: [] for name, _, _ in GARCH_SPECS}
     dates: list = []
@@ -204,7 +204,7 @@ def fit_har(df: pd.DataFrame, cfg: config.MarketConfig, legacy: bool,
     from sklearn.linear_model import LinearRegression
 
     feats = ["har_daily", "har_weekly", "har_monthly"]
-    test = df[cfg.test_start:]
+    test = df[cfg.test_start:cfg.test_end]
     preds: list = []
     dates: list = []
 
@@ -229,7 +229,7 @@ def fit_trees(df: pd.DataFrame, cfg: config.MarketConfig, legacy: bool,
     out = {"LightGBM": [], "XGBoost": []}
     dates: list = []
     fit_log: list[dict] = []
-    test = df[cfg.test_start:]
+    test = df[cfg.test_start:cfg.test_end]
 
     def clean(frame):
         return np.nan_to_num(frame.values, nan=0, posinf=0, neginf=0)
@@ -417,7 +417,7 @@ def main() -> int:
         assert_no_leakage(meta, cfg)
         print("  leakage assertions passed")
 
-    actual = df[cfg.test_start:][cfg.target]
+    actual = df[cfg.test_start:cfg.test_end][cfg.target]
     all_metrics = {name: metrics(actual, preds) for name, preds in forecasts.items()}
 
     frame = pd.DataFrame(forecasts)

@@ -19,15 +19,24 @@ Three markets are registered:
            Day in 2017, COVID, the 2022 election -- at the cost of the four
            implied-vol features.
 
-  br_iv    ^BVSP + IVol-BR, ~2012-2025, 30 features. Arm B. Buys feature
-           parity with the US study at the cost of training history, because
-           no Brazilian implied-volatility index exists before ~2011.
+  br_iv    ^BVSP + IVol-BR, 2011-08..2022-04, 30 features. The main
+           Brazilian arm. IVol-BR is published by NEFIN (Nucleo de Economia
+           Financeira, FEA-USP) and built from IBOVESPA options -- the genuine
+           BRL-denominated VIX analogue.
 
-Arm A and Arm B deliberately share the same validation window and the same
-test window, so their QLIKE numbers are computed over identical evaluation
-days. The only things that vary between them are the training start and the
-presence of the implied-vol features, which is what makes the A-vs-B contrast
-a clean measurement of how much of the result depends on having implied vol.
+  us_2018  The US on the same evaluation window as the Brazilian arms, so the
+           cross-market comparison is not confounded by regime.
+
+IVol-BR runs 2011-08-01 to 2022-04-29 (2,415 rows). That end date, not the
+start, is what drives the design: only 71 IVol-BR observations fall after
+2022-01-01, so the original 2022-2025 test window is unusable. Evaluation
+therefore moves to 2018-01-01..2022-04-29, which yields 940 test days --
+close to the 980 of the US study, so the two are comparable in size.
+
+br_long and br_iv share that evaluation window exactly, so their QLIKE numbers
+are computed over identical days. The only things that vary are the training
+start and the presence of the implied-vol features, which is what makes the
+contrast a clean measurement of what implied vol is worth.
 """
 
 from __future__ import annotations
@@ -83,6 +92,10 @@ class MarketConfig:
     train_end: str
     val_end: str
     test_start: str
+    # Upper bound on the evaluation window. None means "to the end of the
+    # panel". Needed because IVol-BR stops in April 2022 while the equity
+    # series runs to 2025.
+    test_end: str | None
 
     use_iv: bool
     # None means "decide from the data" -- see the volume gate in
@@ -90,6 +103,12 @@ class MarketConfig:
     use_volume: bool | None
 
     notes: str = ""
+
+    # Ceiling on the fraction of panel rows whose implied-vol value had to be
+    # carried forward. IVol-BR is sparser than ^VIX -- it has blank entries and
+    # skips some B3 sessions -- so it needs a looser bound than a market fed by
+    # an exchange-published index.
+    max_iv_ffill: float = 0.05
 
     # --- Shared across every market. Held here rather than as module-level
     # constants so a market *could* override them, and so the values are
@@ -189,6 +208,16 @@ class MarketConfig:
         ]
 
 
+IVOLBR_URL = "https://nefin.com.br/resources/volatility_index/IVol-BR.csv"
+
+# Evaluation window shared by the Brazilian arms and by us_2018. Set by where
+# IVol-BR actually ends, not by preference.
+BR_TEST_START = "2018-01-01"
+BR_TEST_END = "2022-04-29"
+BR_TRAIN_END = "2016-12-31"
+BR_VAL_END = "2017-12-31"
+BR_SPLIT_YEAR = 2020  # COVID is the high-volatility year in this window
+
 MARKETS: dict[str, MarketConfig] = {
     "us": MarketConfig(
         name="us",
@@ -201,6 +230,7 @@ MARKETS: dict[str, MarketConfig] = {
         train_end="2018-12-31",
         val_end="2021-12-31",
         test_start="2022-01-01",
+        test_end=None,
         use_iv=True,
         use_volume=True,
         notes=(
@@ -210,11 +240,28 @@ MARKETS: dict[str, MarketConfig] = {
             "an in-sample 1-day GARCH filter against a 5-day forward target."
         ),
     ),
-    # -------------------------------------------------------------------
-    # Brazilian arms. Dates below are PROVISIONAL until 00_probe_sources.py
-    # has been run on a machine with network access -- see the step-0 notes
-    # in data/br_long/PROVENANCE.md and data/br_iv/PROVENANCE.md.
-    # -------------------------------------------------------------------
+    "us_2018": MarketConfig(
+        name="us_2018",
+        equity_ticker="^GSPC",
+        equity_label="S&P 500",
+        iv_spec="yfinance:^VIX",
+        iv_label="CBOE VIX",
+        start="2004-01-01",
+        end="2025-12-31",
+        train_end=BR_TRAIN_END,
+        val_end=BR_VAL_END,
+        test_start=BR_TEST_START,
+        test_end=BR_TEST_END,
+        split_year=BR_SPLIT_YEAR,
+        use_iv=True,
+        use_volume=True,
+        notes=(
+            "The US evaluated on the Brazilian window. Without this, a "
+            "Brazil-vs-US comparison would contrast 2018-2022 in Brazil "
+            "against 2022-2025 in the US -- different regimes, so any "
+            "difference would be unattributable."
+        ),
+    ),
     "br_long": MarketConfig(
         name="br_long",
         equity_ticker="^BVSP",
@@ -222,34 +269,43 @@ MARKETS: dict[str, MarketConfig] = {
         iv_spec=None,
         iv_label=None,
         start="2004-01-01",
-        end="2025-12-31",
-        train_end="2018-12-31",
-        val_end="2021-12-31",
-        test_start="2022-01-01",
+        end=BR_TEST_END,
+        train_end=BR_TRAIN_END,
+        val_end=BR_VAL_END,
+        test_start=BR_TEST_START,
+        test_end=BR_TEST_END,
+        split_year=BR_SPLIT_YEAR,
         use_iv=False,
         use_volume=None,  # gated on data quality; ^BVSP volume is unreliable
         notes=(
-            "Arm A. Full Brazilian history, no implied-vol features. Keeps "
-            "2008, the 2014-16 recession and Joesley Day in the training set."
+            "No implied-vol features, but training reaches back to 2004 and so "
+            "includes 2008, the 2014-16 recession and Joesley Day. Same "
+            "evaluation window as br_iv, so the pair isolates what implied vol "
+            "is worth."
         ),
     ),
     "br_iv": MarketConfig(
         name="br_iv",
         equity_ticker="^BVSP",
         equity_label="Ibovespa",
-        iv_spec="csv:ivolbr_raw.csv",
-        iv_label="IVol-BR (FGV EESP)",
-        start="2012-01-01",  # PROVISIONAL: IVol-BR is expected to start ~Aug 2011
-        end="2025-12-31",
-        train_end="2018-12-31",
-        val_end="2021-12-31",
-        test_start="2022-01-01",
+        iv_spec=f"url:{IVOLBR_URL}",
+        iv_label="IVol-BR (NEFIN, FEA-USP)",
+        start="2011-08-01",  # IVol-BR's first observation
+        end=BR_TEST_END,
+        train_end=BR_TRAIN_END,
+        val_end=BR_VAL_END,
+        test_start=BR_TEST_START,
+        test_end=BR_TEST_END,
+        split_year=BR_SPLIT_YEAR,
         use_iv=True,
         use_volume=None,
+        # IVol-BR carries ~4% blank entries and skips some B3 sessions, so it
+        # needs a looser forward-fill bound than an exchange-published index.
+        max_iv_ffill=0.12,
         notes=(
-            "Arm B. Feature parity with the US study. Shares br_long's "
-            "validation and test windows exactly, so the A-vs-B QLIKE "
-            "comparison is computed over identical evaluation days."
+            "The main Brazilian arm. IVol-BR is built from IBOVESPA options "
+            "and published by NEFIN at FEA-USP: same underlying, same "
+            "currency, same exchange calendar as ^BVSP."
         ),
     ),
 }

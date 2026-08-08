@@ -1,99 +1,68 @@
-# Arm B — Ibovespa with IVol-BR implied volatility
+# Arm B — Ibovespa with IVol-BR
 
-**Status: NOT YET POPULATED.** This directory is empty pending step 0, and
-this arm has a licensing question that must be resolved before any data file
-is committed here.
+## Source
 
-## What this arm is
+**IVol-BR**, the Brazilian implied-volatility index built from IBOVESPA options,
+published by **NEFIN** (Núcleo de Economia Financeira), FEA-USP.
 
-`^BVSP` plus **IVol-BR**, giving full 30-feature parity with the US study, at
-the cost of training history: IVol-BR does not reach back to 2004.
+- Page: https://nefin.com.br/data/volatility-index/
+- File: https://nefin.com.br/resources/volatility_index/IVol-BR.csv
+- Retrieved: 2026-08-08 → `ivolbr_raw.csv` (44,743 bytes)
+- Terms: NEFIN states it makes its data "freely available for academics and
+  practitioners", with no stated redistribution restriction, so the snapshot is
+  committed here. Cite NEFIN and the methodology paper (Astorino, Chague,
+  Giovannetti & Silva, *Variance Premium and Implied Volatility in a
+  Low-Liquidity Option Market*) in any published work.
 
-IVol-BR is the Brazilian implied-volatility index constructed from IBOVESPA
-options by the Centro de Estudos em Finanças at FGV EESP (Astorino, Chague,
-Giovannetti & Silva). It is the genuine BRL-denominated VIX analogue — same
-underlying as the equity series, same currency, same exchange, same trading
-calendar.
+The pipeline re-fetches from that URL on each run and falls back to the committed
+snapshot if the fetch fails, so there is no manual download step.
 
-## Why IVol-BR and not `^VXEWZ`
+## Coverage
 
-`^VXEWZ` (CBOE's Brazil ETF Volatility Index) is tempting because yfinance can
-fetch it with no manual step. It was rejected on two grounds:
+| | |
+|---|---|
+| Range | 2011-08-01 → 2022-04-29 |
+| Rows | 2,415 (2,318 usable) |
+| Blank `ivolbr` | 97 (4.0%) |
+| Units | percentage points — median 23.09, min 5.30, max 118.52 (COVID) |
+| Per year | 204–244 observations |
 
-1. **It prices the wrong thing.** VXEWZ is implied volatility of `EWZ`, a
-   USD-denominated, US-listed Brazil ETF. It therefore bundles Ibovespa
-   volatility with BRL/USD exchange-rate volatility. Feeding it as "Brazilian
-   implied vol" would quietly change the research question.
-2. **It follows the wrong calendar.** VXEWZ trades on the US calendar. B3
-   closes for Carnival and Corpus Christi; the NYSE closes for Thanksgiving
-   and Independence Day. Merging a US-calendar IV series onto a B3-calendar
-   equity series forces forward-filling on every US holiday that is a Brazilian
-   trading day. IVol-BR follows B3, so the merge is clean.
+Format is `year,month,day,ivolbr` — separate integer date columns, not a date
+column. `_parse_iv_table()` in `code/01_collect_data.py` handles both shapes.
 
-If you later want the USD-investor question answered, the coherent pairing is
+## The end date drives the design
+
+**IVol-BR stops on 2022-04-29.** Only 71 observations fall after 2022-01-01, so
+the original 2022–2025 test window is unusable — it would score against a
+forward-filled constant for 95% of the evaluation.
+
+Evaluation therefore runs **2018-01-01 → 2022-04-29** (~1,090 trading days,
+against the US study's 980), with training from 2011-08 and the walk-forward
+validation block taken from the 252 rows before each batch. `br_long` and
+`us_2018` use the identical window so all three are comparable.
+
+If NEFIN later extends the series, update `BR_TEST_END` in `code/config.py` and
+re-run; nothing else is date-coupled.
+
+## Data-quality notes
+
+- **Forward-fill ceiling is 12%** for this market (`max_iv_ffill`), against 5%
+  elsewhere. IVol-BR carries 4% blanks *and* skips some B3 sessions, so a
+  ^VIX-calibrated bound would reject a perfectly good panel. The measured value
+  is reported by `01_collect_data.py` and recorded in the run report — check it
+  rather than assuming.
+- **Scale gate**: `iv_lag1`/`iv_lag5` divide by 100, assuming percentage points.
+  The median of 23.09 confirms this; the gate rejects anything outside 1–200.
+
+## Why not `^VXEWZ`
+
+`^VXEWZ` is fetchable straight from Yahoo, which is tempting, but it prices
+implied volatility of `EWZ` — a USD-denominated, US-listed Brazil ETF — so it
+bundles Ibovespa volatility with BRL/USD exchange-rate volatility. It also
+follows the US calendar, which would force forward-filling on every US holiday
+that is a B3 trading day, and drop Carnival and Corpus Christi. IVol-BR shares
+`^BVSP`'s underlying, currency and calendar.
+
+If the USD-investor question is worth answering later, the coherent pairing is
 `EWZ` + `^VXEWZ` — same underlying on both sides — as a separate market entry,
 not as a substitute here.
-
-## BLOCKER: redistribution terms
-
-**Check FGV's terms before committing any file to this directory.**
-
-IVol-BR is distributed as a file download, not through an API, so it cannot be
-pulled by a script the way `^VIX` can. That makes committing a snapshot the
-obvious move — but only if FGV's terms permit redistribution. Do not assume
-they do.
-
-If redistribution is **permitted**: place the download at
-`data/br_iv/ivolbr_raw.csv` (the path `code/config.py` expects) and record the
-retrieval date, source URL and licence below.
-
-If redistribution is **not permitted**: commit only the derived feature
-columns (`iv_lag1`, `iv_lag5`, `iv_change`) plus fetch instructions, and record
-that decision here. Do not commit the raw level series.
-
-`code/01_collect_data.py` accepts any CSV with a recognisable date column and
-a numeric value column, so no reformatting is needed.
-
-## To populate
-
-```bash
-python code/00_probe_sources.py --ivolbr /path/to/download.csv   # needs network
-cp /path/to/download.csv data/br_iv/ivolbr_raw.csv
-python code/01_collect_data.py --market br_iv
-```
-
-## Step 0 — record findings here
-
-- [ ] IVol-BR first date and last date (expected start ~August 2011)
-- [ ] Source URL, retrieval date, licence / terms of use
-- [ ] Redistribution decision: raw file committed, or derived columns only
-- [ ] Calendar agreement with `^BVSP` — count of `^BVSP` days with no IVol-BR
-      observation, which is how often the feature goes stale via forward-fill
-
-### Then set the sample start
-
-`code/config.py` currently has `br_iv.start = "2012-01-01"`, which is
-**provisional**. Set it from IVol-BR's actual first date, rounded up to the
-next January so the arm starts on a clean year boundary.
-
-Note the knock-on effect: the walk-forward split needs
-`val_window + 2 * embargo` rows of history before the first test batch, and
-`code/03_run_core_models.py` refuses to run rather than silently shrinking the
-training set. With `val_window = 252` that is roughly 262 trading days before
-2022-01-01, which a 2012 start comfortably clears.
-
-## Scale check
-
-`code/01_collect_data.py` divides the implied-vol level by 100 to reach
-decimals for `iv_lag1` and `iv_lag5`, assuming a VIX-style percentage-point
-quote. It validates this: if the series median falls outside 1–200 it refuses
-to build the panel rather than producing silently wrong features. If IVol-BR
-turns out to be quoted as a decimal, adjust `IV_SCALE` in that file.
-
-## Forward-fill limit
-
-The merge is capped at 5% forward-filled rows. Above that,
-`01_collect_data.py` fails rather than building a panel whose implied-vol
-features are mostly stale. Since both series follow B3, exceeding this would
-indicate a real problem with the download — investigate rather than raising
-the limit.

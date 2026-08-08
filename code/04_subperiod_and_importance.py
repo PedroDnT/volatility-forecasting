@@ -57,17 +57,21 @@ def subperiod_metrics(fc: pd.DataFrame, cfg: config.MarketConfig) -> dict:
     models = [c for c in fc.columns if c != "actual"]
     out: dict = {"by_year": {}, "by_regime": {}}
 
+    # "Other" is every year that is not the split year, not merely the later
+    # ones. On the US 2022+ window the two definitions coincide, but on the
+    # Brazilian 2018-2022 window the split year is 2020 (COVID) and a
+    # strictly-later mask would silently drop 2018 and 2019 from both blocks.
     is_split = np.asarray(fc.index.year == cfg.split_year)
-    is_after = np.asarray(fc.index.year > cfg.split_year)
+    is_other = ~is_split
 
     out["by_year"][f"{cfg.split_year}_high_vol"] = {
         "N": int(is_split.sum()),
         "models": {m: metrics(actual[is_split], fc[m].values[is_split])
                    for m in models},
     }
-    out["by_year"][f"after_{cfg.split_year}_lower_vol"] = {
-        "N": int(is_after.sum()),
-        "models": {m: metrics(actual[is_after], fc[m].values[is_after])
+    out["by_year"]["other_years"] = {
+        "N": int(is_other.sum()),
+        "models": {m: metrics(actual[is_other], fc[m].values[is_other])
                    for m in models},
     }
 

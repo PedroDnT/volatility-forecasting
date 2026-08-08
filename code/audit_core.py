@@ -155,19 +155,17 @@ def check_subperiods(fc: pd.DataFrame, path: Path, split_year: int,
     actual = fc["actual"].values
     models = [c for c in fc.columns if c != "actual"]
 
-    masks = {
-        f"{split_year}_high_vol": np.asarray(fc.index.year == split_year),
-        f"after_{split_year}_lower_vol": np.asarray(fc.index.year > split_year),
-    }
+    is_split = np.asarray(fc.index.year == split_year)
+    masks = {f"{split_year}_high_vol": is_split, "other_years": ~is_split}
     by_year = stored.get("by_year", {})
     for label, mask in masks.items():
         block = by_year.get(label)
         if block is None:
-            # The legacy root-level snapshot names the post-split block
-            # "2023_2025_lower_vol" rather than "after_2022_lower_vol".
+            # The legacy root-level snapshot names the non-split block
+            # "2023_2025_lower_vol" rather than "other_years".
             block = next(
                 (v for k, v in by_year.items()
-                 if k != f"{split_year}_high_vol" and label.startswith("after_")),
+                 if k != f"{split_year}_high_vol" and label == "other_years"),
                 None,
             )
         if block is None:
@@ -269,8 +267,11 @@ def check_expected(fc: pd.DataFrame, path: Path, rep: Report) -> None:
         for key, value in block.items():
             rep.close(f"full.{model}.{key}", computed[key], value, tol=5e-4)
 
+    split_year = expected.get("split_year")
     for label, block in expected.get("by_year", {}).items():
-        if label.startswith("after_"):
+        if label == "other_years":
+            mask = np.asarray(fc.index.year != split_year)
+        elif label.startswith("after_"):  # legacy expectations files
             mask = np.asarray(fc.index.year > int(label.split("_")[1]))
         else:
             mask = np.asarray(fc.index.year == int(label.split("_")[0]))
@@ -284,16 +285,15 @@ def build_expected(fc: pd.DataFrame, split_year: int) -> dict:
     actual = fc["actual"].values
     models = [c for c in fc.columns if c != "actual"]
 
-    out: dict = {"full_sample": {}, "by_year": {}}
+    out: dict = {"split_year": split_year, "full_sample": {}, "by_year": {}}
     for m in models:
         c = metrics(actual, fc[m].values)
         out["full_sample"][m] = {k: round(c[k], 6)
                                  for k in ["QLIKE", "RMSE", "MAE", "MZ_R2"]}
 
-    for label, mask in [
-        (f"{split_year}_high_vol", np.asarray(fc.index.year == split_year)),
-        (f"after_{split_year}_lower_vol", np.asarray(fc.index.year > split_year)),
-    ]:
+    is_split = np.asarray(fc.index.year == split_year)
+    for label, mask in [(f"{split_year}_high_vol", is_split),
+                        ("other_years", ~is_split)]:
         out["by_year"][label] = {
             m: round(metrics(actual[mask], fc[m].values[mask])["QLIKE"], 6)
             for m in models

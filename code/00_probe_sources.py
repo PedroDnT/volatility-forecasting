@@ -35,19 +35,16 @@ import config  # noqa: E402
 PROBE_TICKERS = ["^BVSP", "^GSPC", "^VXEWZ", "EWZ", "BOVA11.SA", "BRL=X"]
 
 IVOLBR_NOTE = """
-IVol-BR is the Brazilian implied-volatility index built from IBOVESPA options
-by the Centro de Estudos em Financas at FGV EESP (Astorino, Chague,
-Giovannetti & Silva). It is the genuine BRL-denominated VIX analogue.
+IVol-BR is the Brazilian implied-volatility index built from IBOVESPA options,
+published by NEFIN (Nucleo de Economia Financeira) at FEA-USP. It is the
+genuine BRL-denominated VIX analogue.
 
-It is distributed as a file download rather than through an API, so it cannot
-be pulled by a script the way ^VIX can. Download it manually and pass the path
-via --ivolbr.
+It is a plain CSV at a stable URL, so 01_collect_data.py fetches it directly --
+no manual step, and a committed snapshot at data/br_iv/ivolbr_raw.csv serves as
+the offline fallback. Coverage and terms are recorded in
+data/br_iv/PROVENANCE.md.
 
-Before committing the raw file to this repository, CHECK FGV'S REDISTRIBUTION
-TERMS. If they do not permit redistribution, commit only the derived feature
-columns (iv_lag1, iv_lag5, iv_change) plus a fetch script, and record that
-decision in data/br_iv/PROVENANCE.md. Do not commit the raw series on the
-assumption that it is fine.
+Pass --ivolbr to inspect a local copy instead of the committed snapshot.
 """
 
 
@@ -115,9 +112,14 @@ def probe_ivolbr(path: Path | None) -> pd.DataFrame | None:
     print("=" * 72)
 
     if path is None:
-        print(IVOLBR_NOTE)
-        print("No --ivolbr path given; nothing to inspect.")
-        return None
+        default = Path(__file__).resolve().parent.parent / "data" / "br_iv" / "ivolbr_raw.csv"
+        if default.exists():
+            path = default
+            print(f"using the committed snapshot: {path}")
+        else:
+            print(IVOLBR_NOTE)
+            print("No --ivolbr path and no committed snapshot; nothing to inspect.")
+            return None
 
     if not path.exists():
         print(f"file not found: {path}")
@@ -153,13 +155,14 @@ def probe_calendar_overlap(start: str, end: str, ivolbr: pd.DataFrame | None) ->
         print("could not fetch ^BVSP; skipping")
         return
 
-    date_col = next(
-        (c for c in ivolbr.columns if c.lower() in
-         {"date", "data", "dt", "dia", "referencia"}),
-        ivolbr.columns[0],
-    )
-    iv_idx = pd.DatetimeIndex(pd.to_datetime(ivolbr[date_col], errors="coerce")
-                              .dropna().unique())
+    # Reuse the production parser rather than re-deriving the date column --
+    # IVol-BR ships year/month/day columns, so naive detection picks "year".
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "collector", Path(__file__).resolve().parent / "01_collect_data.py")
+    collector = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(collector)
+    iv_idx = pd.DatetimeIndex(collector._parse_iv_table(ivolbr, "IVol-BR").index)
     bv_idx = pd.DatetimeIndex(bvsp.index)
 
     common_start = max(iv_idx.min(), bv_idx.min())

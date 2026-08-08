@@ -1,4 +1,5 @@
 {
+  "split_year": 2022,
   "full_sample": {
     "GARCH": {
       "QLIKE": 0.357162,
@@ -53,7 +54,7 @@
       "XGBoost": 0.290214,
       "Ensemble": 0.259341
     },
-    "after_2022_lower_vol": {
+    "other_years": {
       "GARCH": 0.390782,
       "EGARCH": 0.401373,
       "GJR-GARCH": 0.333513,

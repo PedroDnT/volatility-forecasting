@@ -46,7 +46,6 @@ import config  # noqa: E402
 IV_SCALE = 100.0
 
 MAX_VOLUME_BAD_FRACTION = 0.01  # above this, volume features are switched off
-MAX_IV_FFILL_FRACTION = 0.05  # above this, refuse to build the panel
 
 
 class DataQualityError(RuntimeError):
@@ -105,39 +104,90 @@ def load_cached(path: Path, label: str) -> pd.DataFrame | None:
     return None
 
 
-def load_iv_csv(path: Path) -> pd.DataFrame:
-    """Load a manually-downloaded implied-vol series (IVol-BR).
+def _parse_iv_table(raw: pd.DataFrame, label: str) -> pd.DataFrame:
+    """Normalise an implied-vol table to a single `close` column on a date index.
 
-    Accepts any CSV with a recognisable date column and a numeric value
-    column; the value column is whichever numeric column has the most
-    non-null entries.
+    Handles both shapes seen in the wild: a single date column, and NEFIN's
+    IVol-BR layout of separate year/month/day integer columns. Blank values are
+    dropped here rather than forward-filled, so the merge in build_features()
+    is the only place that decides how gaps are handled.
     """
+    lower = {str(c).strip().lower(): c for c in raw.columns}
+
+    if {"year", "month", "day"} <= set(lower):
+        idx = pd.to_datetime({
+            "year": raw[lower["year"]],
+            "month": raw[lower["month"]],
+            "day": raw[lower["day"]],
+        }, errors="coerce")
+        rest = raw.drop(columns=[lower["year"], lower["month"], lower["day"]])
+    else:
+        date_col = next(
+            (lower[k] for k in ("date", "data", "dt", "dia", "referencia")
+             if k in lower),
+            raw.columns[0],
+        )
+        idx = pd.to_datetime(raw[date_col], errors="coerce", dayfirst=True)
+        rest = raw.drop(columns=[date_col])
+
+    numeric = rest.apply(pd.to_numeric, errors="coerce")
+    if numeric.empty or not len(numeric.columns):
+        raise DataQualityError(f"no numeric column found in the {label} table")
+    value_col = numeric.notna().sum().idxmax()
+
+    out = pd.DataFrame({"close": numeric[value_col].to_numpy()}, index=idx)
+    n_raw = len(out)
+    out = out[out.index.notna() & out["close"].notna()].sort_index()
+    out = out[~out.index.duplicated(keep="last")]
+    out.index.name = "date"
+
+    print(f"  {label}: {len(out):,} usable rows from column {value_col!r} "
+          f"({n_raw - len(out)} blank/unparseable dropped), "
+          f"{out.index[0].date()} to {out.index[-1].date()}")
+    return out
+
+
+def load_iv_url(url: str, cache: Path, retries: int = 4) -> pd.DataFrame:
+    """Fetch a published implied-vol series over HTTP, caching the raw file.
+
+    IVol-BR is a plain CSV at a stable URL, so the Brazilian arm needs no
+    manual download step -- the whole pipeline stays script-reproducible.
+    """
+    import urllib.request
+
+    delay = 2.0
+    last_error: Exception | None = None
+    for attempt in range(1, retries + 1):
+        try:
+            with urllib.request.urlopen(url, timeout=60) as resp:
+                cache.write_bytes(resp.read())
+            break
+        except Exception as exc:  # noqa: BLE001 - retried below
+            last_error = exc
+            if attempt < retries:
+                print(f"  IV fetch attempt {attempt}/{retries} failed "
+                      f"({exc}); retrying in {delay:.0f}s")
+                time.sleep(delay)
+                delay *= 2
+    else:
+        if not cache.exists():
+            raise DataQualityError(
+                f"could not fetch the implied-vol series from {url} after "
+                f"{retries} attempts: {last_error}"
+            )
+        print(f"  IV fetch failed ({last_error}); falling back to {cache.name}")
+
+    return _parse_iv_table(pd.read_csv(cache), cache.stem)
+
+
+def load_iv_csv(path: Path) -> pd.DataFrame:
+    """Load an implied-vol series from a file already on disk."""
     if not path.exists():
         raise DataQualityError(
             f"implied-vol file not found: {path}\n"
-            f"IVol-BR is distributed as a download rather than an API. Fetch "
-            f"it, place it at that path, and see data/br_iv/PROVENANCE.md."
+            f"See data/br_iv/PROVENANCE.md for where it comes from."
         )
-
-    raw = pd.read_csv(path)
-    date_col = next(
-        (c for c in raw.columns
-         if str(c).strip().lower() in {"date", "data", "dt", "dia", "referencia"}),
-        raw.columns[0],
-    )
-    idx = pd.to_datetime(raw[date_col], errors="coerce", dayfirst=True)
-
-    numeric = raw.drop(columns=[date_col]).apply(pd.to_numeric, errors="coerce")
-    if numeric.empty or not len(numeric.columns):
-        raise DataQualityError(f"no numeric column found in {path}")
-    value_col = numeric.notna().sum().idxmax()
-
-    out = pd.DataFrame({"close": numeric[value_col].values}, index=idx)
-    out = out[out.index.notna() & out["close"].notna()].sort_index()
-    out.index.name = "date"
-    print(f"  IV csv: {len(out):,} rows from column {value_col!r}, "
-          f"{out.index[0].date()} to {out.index[-1].date()}")
-    return out
+    return _parse_iv_table(pd.read_csv(path), path.stem)
 
 
 # ----------------------------------------------------------------------------
@@ -279,14 +329,14 @@ def gate_iv_scale(panel: pd.DataFrame, report: dict) -> None:
         )
 
 
-def gate_iv_ffill(report: dict) -> None:
+def gate_iv_ffill(report: dict, cfg: config.MarketConfig) -> None:
     frac = report.get("iv_ffill_fraction", 0.0)
-    if frac > MAX_IV_FFILL_FRACTION:
+    if frac > cfg.max_iv_ffill:
         raise DataQualityError(
             f"{frac:.2%} of rows required forward-filling the implied-vol "
-            f"series (limit {MAX_IV_FFILL_FRACTION:.0%}). The equity and "
-            f"implied-vol calendars disagree badly; check the source before "
-            f"trusting this panel."
+            f"series (limit {cfg.max_iv_ffill:.0%} for market {cfg.name!r}). "
+            f"The equity and implied-vol calendars disagree more than expected; "
+            f"check the source before trusting this panel."
         )
 
 
@@ -340,6 +390,9 @@ def main() -> int:
         if iv is None:
             if cfg.iv_kind == "yfinance":
                 iv = download_yahoo(str(cfg.iv_ref), cfg.start, cfg.end)
+            elif cfg.iv_kind == "url":
+                iv = load_iv_url(str(cfg.iv_ref),
+                                 cfg.data_dir / "ivolbr_raw.csv")
             elif cfg.iv_kind == "csv":
                 iv = load_iv_csv(cfg.data_dir / str(cfg.iv_ref))
             else:
@@ -355,7 +408,7 @@ def main() -> int:
 
     panel = build_features(px, iv, cfg, report)
     gate_iv_scale(panel, report)
-    gate_iv_ffill(report)
+    gate_iv_ffill(report, cfg)
 
     before = len(panel)
     if args.legacy_quirks:

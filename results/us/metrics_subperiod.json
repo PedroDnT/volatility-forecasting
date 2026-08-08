@@ -68,7 +68,7 @@
         }
       }
     },
-    "after_2022_lower_vol": {
+    "other_years": {
       "N": 729,
       "models": {
         "GARCH": {

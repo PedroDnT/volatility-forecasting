@@ -1,0 +1,190 @@
+{
+  "market": "us_2018",
+  "fit_window": "2004-04-07 to 2017-12-31",
+  "fit_rows": 3458,
+  "best_iteration": 45,
+  "importance_type": "split",
+  "n_features": 30,
+  "ranked": [
+    {
+      "rank": 1,
+      "feature": "vix_close",
+      "importance": 148,
+      "share": 0.10962962962962963
+    },
+    {
+      "rank": 2,
+      "feature": "neg_return_5d",
+      "importance": 113,
+      "share": 0.0837037037037037
+    },
+    {
+      "rank": 3,
+      "feature": "log_return",
+      "importance": 91,
+      "share": 0.0674074074074074
+    },
+    {
+      "rank": 4,
+      "feature": "har_monthly",
+      "importance": 82,
+      "share": 0.06074074074074074
+    },
+    {
+      "rank": 5,
+      "feature": "rv_5d_lag22",
+      "importance": 78,
+      "share": 0.057777777777777775
+    },
+    {
+      "rank": 6,
+      "feature": "rv_5d_lag5",
+      "importance": 70,
+      "share": 0.05185185185185185
+    },
+    {
+      "rank": 7,
+      "feature": "vix_lag5",
+      "importance": 67,
+      "share": 0.04962962962962963
+    },
+    {
+      "rank": 8,
+      "feature": "volume_ma_ratio",
+      "importance": 64,
+      "share": 0.047407407407407405
+    },
+    {
+      "rank": 9,
+      "feature": "pos_return_5d",
+      "importance": 63,
+      "share": 0.04666666666666667
+    },
+    {
+      "rank": 10,
+      "feature": "range_vol",
+      "importance": 62,
+      "share": 0.045925925925925926
+    },
+    {
+      "rank": 11,
+      "feature": "rv_5d_lag10",
+      "importance": 60,
+      "share": 0.044444444444444446
+    },
+    {
+      "rank": 12,
+      "feature": "vix_lag1",
+      "importance": 55,
+      "share": 0.040740740740740744
+    },
+    {
+      "rank": 13,
+      "feature": "har_weekly",
+      "importance": 54,
+      "share": 0.04
+    },
+    {
+      "rank": 14,
+      "feature": "rv_5d_lag1",
+      "importance": 52,
+      "share": 0.03851851851851852
+    },
+    {
+      "rank": 15,
+      "feature": "rv_5d_lag2",
+      "importance": 38,
+      "share": 0.028148148148148148
+    },
+    {
+      "rank": 16,
+      "feature": "rv_5d_lag3",
+      "importance": 37,
+      "share": 0.027407407407407408
+    },
+    {
+      "rank": 17,
+      "feature": "abs_ret_lag2",
+      "importance": 35,
+      "share": 0.025925925925925925
+    },
+    {
+      "rank": 18,
+      "feature": "abs_ret_lag3",
+      "importance": 33,
+      "share": 0.024444444444444446
+    },
+    {
+      "rank": 19,
+      "feature": "abs_ret_lag22",
+      "importance": 31,
+      "share": 0.022962962962962963
+    },
+    {
+      "rank": 20,
+      "feature": "vix_change",
+      "importance": 28,
+      "share": 0.02074074074074074
+    },
+    {
+      "rank": 21,
+      "feature": "abs_ret_lag1",
+      "importance": 26,
+      "share": 0.01925925925925926
+    },
+    {
+      "rank": 22,
+      "feature": "abs_ret_lag10",
+      "importance": 26,
+      "share": 0.01925925925925926
+    },
+    {
+      "rank": 23,
+      "feature": "volume_change",
+      "importance": 14,
+      "share": 0.01037037037037037
+    },
+    {
+      "rank": 24,
+      "feature": "abs_ret_lag5",
+      "importance": 13,
+      "share": 0.00962962962962963
+    },
+    {
+      "rank": 25,
+      "feature": "har_daily",
+      "importance": 8,
+      "share": 0.005925925925925926
+    },
+    {
+      "rank": 26,
+      "feature": "dow_1",
+      "importance": 1,
+      "share": 0.0007407407407407407
+    },
+    {
+      "rank": 27,
+      "feature": "dow_3",
+      "importance": 1,
+      "share": 0.0007407407407407407
+    },
+    {
+      "rank": 28,
+      "feature": "dow_0",
+      "importance": 0,
+      "share": 0.0
+    },
+    {
+      "rank": 29,
+      "feature": "dow_2",
+      "importance": 0,
+      "share": 0.0
+    },
+    {
+      "rank": 30,
+      "feature": "dow_4",
+      "importance": 0,
+      "share": 0.0
+    }
+  ]
+}

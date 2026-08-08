@@ -55,6 +55,7 @@ def panel():
 
 @pytest.mark.parametrize("market,with_vol,without_vol", [
     ("us", 30, 28),
+    ("us_2018", 30, 28),
     ("br_long", 26, 24),
     ("br_iv", 30, 28),
 ])
@@ -80,7 +81,7 @@ def test_both_iv_prefixes_recognised():
 
 
 def test_forecast_targets_never_become_features(panel):
-    for market in ("us", "br_long", "br_iv"):
+    for market in config.MARKETS:
         cols = config.get(market).feature_columns(panel)
         assert not [c for c in cols if "_fwd" in c]
 
@@ -88,10 +89,34 @@ def test_forecast_targets_never_become_features(panel):
 def test_brazilian_arms_share_evaluation_windows():
     """The A-vs-B comparison is only clean if the windows are identical."""
     a, b = config.get("br_long"), config.get("br_iv")
-    assert a.test_start == b.test_start
+    assert (a.test_start, a.test_end) == (b.test_start, b.test_end)
     assert a.val_end == b.val_end
     assert a.train_end == b.train_end
     assert a.start != b.start  # ... and the training start is the only change
+
+
+def test_us_2018_matches_the_brazilian_window():
+    """Otherwise Brazil-vs-US contrasts different regimes, not markets."""
+    us18, br = config.get("us_2018"), config.get("br_iv")
+    assert (us18.test_start, us18.test_end) == (br.test_start, br.test_end)
+    assert us18.split_year == br.split_year
+
+
+def test_iv_arm_stops_where_ivolbr_stops():
+    """IVol-BR's last observation is 2022-04-29. Evaluating past it would
+    silently score against a forward-filled constant."""
+    br = config.get("br_iv")
+    assert br.test_end == "2022-04-29"
+    assert br.start == "2011-08-01"
+
+
+def test_split_year_falls_inside_every_test_window():
+    """subperiod_metrics splits on == split_year; a split year outside the
+    window would leave one block empty."""
+    for name, cfg in config.MARKETS.items():
+        lo = int(cfg.test_start[:4])
+        hi = int(cfg.test_end[:4]) if cfg.test_end else 9999
+        assert lo <= cfg.split_year <= hi, name
 
 
 def test_annualization_is_252_everywhere():
@@ -217,9 +242,43 @@ def test_iv_scale_gate_rejects_a_decimal_quoted_series():
 
 
 def test_iv_ffill_gate_rejects_a_badly_mismatched_calendar():
+    cfg = config.get("br_iv")
     with pytest.raises(collector.DataQualityError, match="forward-filling"):
-        collector.gate_iv_ffill({"iv_ffill_fraction": 0.25})
-    collector.gate_iv_ffill({"iv_ffill_fraction": 0.01})
+        collector.gate_iv_ffill({"iv_ffill_fraction": 0.25}, cfg)
+    collector.gate_iv_ffill({"iv_ffill_fraction": 0.01}, cfg)
+
+
+def test_ivolbr_gets_a_looser_ffill_ceiling_than_vix():
+    """IVol-BR has ~4% blanks and skips B3 sessions; ^VIX does neither."""
+    assert config.get("br_iv").max_iv_ffill > config.get("us").max_iv_ffill
+
+
+def test_parses_the_nefin_ivolbr_layout():
+    """IVol-BR ships year/month/day integer columns, not a date column, and
+    carries blank values that must be dropped rather than coerced to zero."""
+    raw = pd.DataFrame({
+        "year": [2011, 2011, 2011],
+        "month": [8, 8, 8],
+        "day": [1, 4, 5],
+        "ivolbr": [21.28711, None, 23.56743],
+    })
+    out = collector._parse_iv_table(raw, "IVol-BR")
+    assert list(out.columns) == ["close"]
+    assert len(out) == 2, "the blank row should be dropped, not filled"
+    assert str(out.index[0].date()) == "2011-08-01"
+    assert out["close"].iloc[0] == pytest.approx(21.28711)
+
+
+@pytest.mark.skipif(not (REPO / "data" / "br_iv" / "ivolbr_raw.csv").exists(),
+                    reason="IVol-BR snapshot not present")
+def test_committed_ivolbr_snapshot_matches_the_configured_window():
+    out = collector._parse_iv_table(
+        pd.read_csv(REPO / "data" / "br_iv" / "ivolbr_raw.csv"), "IVol-BR")
+    cfg = config.get("br_iv")
+    assert str(out.index[0].date()) == cfg.start
+    assert str(out.index[-1].date()) == cfg.test_end
+    # Percentage points, so the /100 rescaling in build_features is right.
+    assert 1.0 < out["close"].median() < 200.0
 
 
 # ---------------------------------------------------------------------------
