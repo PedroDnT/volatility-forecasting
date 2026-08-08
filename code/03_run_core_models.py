@@ -317,7 +317,8 @@ def metrics(actual: pd.Series, predicted: pd.Series) -> dict:
     a, p = a[mask], p[mask]
 
     keys = ["MSE", "MAE", "RMSE", "QLIKE", "R2", "MZ_R2", "N"]
-    if len(a) == 0:
+    # pearsonr needs at least two points, so guard on 2 rather than 0.
+    if len(a) < 2:
         return {k: float("nan") for k in keys}
 
     mse = np.mean((a - p) ** 2)

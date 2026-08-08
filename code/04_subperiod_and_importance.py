@@ -34,7 +34,8 @@ def metrics(actual: np.ndarray, predicted: np.ndarray) -> dict:
     mask = ~(np.isnan(actual) | np.isnan(predicted))
     a, p = actual[mask], predicted[mask]
     keys = ["MSE", "MAE", "RMSE", "QLIKE", "R2", "MZ_R2", "N"]
-    if len(a) == 0:
+    # pearsonr needs at least two points, so guard on 2 rather than 0.
+    if len(a) < 2:
         return {k: float("nan") for k in keys}
 
     mse = np.mean((a - p) ** 2)

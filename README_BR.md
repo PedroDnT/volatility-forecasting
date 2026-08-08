@@ -203,8 +203,8 @@ their own audit while a fresh run of the same pipeline did not. Addressed:
 
 A `--legacy-quirks` flag restores the original behaviour. It exists only for
 the regression test that proves this refactor is behaviour-preserving: under it
-LightGBM and HAR-RV reproduce the committed forecasts bit-identically and the
-GARCH family to ~1e-8. It is not an analysis arm, and the audit fails any run
+LightGBM reproduces the committed forecasts bit-identically, HAR-RV to machine
+epsilon, and the GARCH family to ~1e-8. It is not an analysis arm, and the audit fails any run
 whose `fit_metadata.json` records it.
 
 ## Files

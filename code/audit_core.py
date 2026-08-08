@@ -79,7 +79,8 @@ def newey_west_se(d: np.ndarray, q: int) -> float:
 def metrics(actual: np.ndarray, predicted: np.ndarray) -> dict | None:
     mask = ~(np.isnan(actual) | np.isnan(predicted))
     a, p = actual[mask], predicted[mask]
-    if len(a) == 0:
+    # pearsonr needs at least two points, so guard on 2 rather than 0.
+    if len(a) < 2:
         return None
     mse = np.mean((a - p) ** 2)
     ratio = (a ** 2) / (p ** 2 + QLIKE_EPS)
