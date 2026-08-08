@@ -1,0 +1,26 @@
+# Pinned environment for the multi-market volatility-forecasting pipeline.
+#
+# Why pins: the original release shipped no version constraints, and on a
+# current toolchain XGBoost drifts materially. Re-running the committed US
+# pipeline with unpinned libraries moved XGBoost's full-sample QLIKE from
+# 0.3553 to 0.3487 -- roughly four times the paper's headline Ensemble-vs-
+# GJR-GARCH gap (0.0016) -- and failed five audit checks. Every other model
+# reproduced to machine precision, so the fragility is specific to XGBoost,
+# but the fix is to pin everything.
+#
+# These pins describe the environment used to generate results/<market>/ in
+# this branch. The legacy root-level results/ snapshot predates this file and
+# was produced on an unrecorded environment; it is kept only as a historical
+# artifact and is not reproducible from these pins.
+#
+# Python 3.11+
+
+arch==8.0.0
+lightgbm==4.7.0
+numpy==2.4.6
+pandas==3.0.5
+pyarrow==25.0.0
+scikit-learn==1.9.0
+scipy==1.17.1
+xgboost==3.2.0
+yfinance==1.5.2

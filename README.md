@@ -80,6 +80,22 @@ volatility-forecasting/
 
 ## Reproducing the paper
 
+> **Note — the pipeline is now multi-market.** Every script takes `--market`
+> (`us`, `br_long`, `br_iv`) and writes to `data/<market>/` and
+> `results/<market>/`. See [README_BR.md](README_BR.md) for the Brazilian
+> replication, and for two corrections to the model code that materially change
+> the US numbers below: with a proper validation split and a genuine
+> walk-forward GARCH forecast, the ensemble drops from 1st to 4th and
+> GJR-GARCH wins both subperiods.
+>
+> The files under `data/` and `results/` at the repository root are the
+> original snapshot backing the tables in this README and the paper. They are
+> left untouched. The corrected US baseline lives in `results/us/`.
+>
+> Dependencies are now pinned in [requirements.txt](requirements.txt) — the
+> unpinned install below reproduces every model except XGBoost, which drifts
+> by more than the paper's headline margin on a current toolchain.
+
 The full pipeline runs on a single laptop in under five minutes from a clean Python 3.11+ environment.
 
 ```bash
@@ -87,6 +103,7 @@ git clone https://github.com/ayk5511/volatility-forecasting.git
 cd volatility-forecasting
 
 python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt      # or the unpinned list below
 pip install yfinance pandas numpy pyarrow scipy scikit-learn lightgbm xgboost arch
 
 # Step 1: Download raw data + build feature panel.
