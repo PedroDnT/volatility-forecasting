@@ -35,3 +35,6 @@ venv/
 !data/vix_daily.parquet
 !data/combined.parquet
 !results/forecasts_5d.parquet
+
+# Test / build artifacts
+.pytest_cache/

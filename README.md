@@ -49,7 +49,6 @@ volatility-forecasting/
 ├── .gitignore
 ├── code/
 │   ├── 01_collect_data.py                 # Yahoo Finance pull + feature engineering
-│   ├── 02_models.py                       # Reference model module
 │   ├── 03_run_core_models.py              # Main runner (GARCH + HAR + LightGBM + XGBoost + Ensemble)
 │   ├── 04_subperiod_and_importance.py     # Subperiod metrics + LightGBM split-importance
 │   ├── 05_dm_tests.py                     # Diebold-Mariano two-sided tests with HAC SE

@@ -253,6 +253,33 @@ def test_ivolbr_gets_a_looser_ffill_ceiling_than_vix():
     assert config.get("br_iv").max_iv_ffill > config.get("us").max_iv_ffill
 
 
+def test_equity_csv_does_not_mangle_iso_dates(tmp_path):
+    """dayfirst parsing turns 2020-01-02 into 1 February. It must not."""
+    path = tmp_path / "px.csv"
+    path.write_text("Date,Open,High,Low,Close,Volume\n"
+                    "2020-01-02,1,2,0.5,1.5,10\n"
+                    "2020-01-03,1,2,0.5,1.4,12\n")
+    df = collector.load_equity_csv(path)
+    assert [str(d.date()) for d in df.index] == ["2020-01-02", "2020-01-03"]
+
+
+def test_equity_csv_accepts_portuguese_headers(tmp_path):
+    path = tmp_path / "px.csv"
+    path.write_text("Data,Abertura,Maxima,Minima,Fechamento\n"
+                    "02/01/2020,1,2,0.5,1.5\n"
+                    "03/01/2020,1,2,0.5,1.4\n")
+    df = collector.load_equity_csv(path)
+    assert {"open", "high", "low", "close"} <= set(df.columns)
+    assert [str(d.date()) for d in df.index] == ["2020-01-02", "2020-01-03"]
+
+
+def test_equity_csv_rejects_a_table_without_prices(tmp_path):
+    path = tmp_path / "px.csv"
+    path.write_text("Date,Something\n2020-01-02,1\n")
+    with pytest.raises(collector.DataQualityError, match="missing required"):
+        collector.load_equity_csv(path)
+
+
 def test_parses_the_nefin_ivolbr_layout():
     """IVol-BR ships year/month/day integer columns, not a date column, and
     carries blank values that must be dropped rather than coerced to zero."""

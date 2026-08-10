@@ -29,10 +29,10 @@ Brazil-vs-US compares the same period rather than different regimes.
 
 ## Status
 
-`us` and `us_2018` are done. The Brazilian arms need `^BVSP`, which Yahoo would not
-serve from the build environment (HTTP 429 on every ticker). One command each once
-Yahoo responds; see [`data/br_long/PROVENANCE.md`](data/br_long/PROVENANCE.md) for
-the open `^BVSP` volume-quality question.
+`us` and `us_2018` are done and audited. The Brazilian arms need `^BVSP`, which the
+build environment could not fetch (Yahoo HTTP 429 on every ticker; Stooq behind a
+JavaScript bot-wall). Everything else is built and tested — run this on any machine
+with network access:
 
 ```bash
 pip install -r requirements.txt
@@ -42,11 +42,22 @@ python code/04_subperiod_and_importance.py --market br_iv
 python code/05_dm_tests.py                 --market br_iv
 python code/05b_mcs_spa.py                 --market br_iv
 python code/06_audit.py                    --market br_iv --regenerate
-python -m pytest tests/
 ```
 
-Artifacts land in `data/<market>/` and `results/<market>/`. Root-level `data/` and
-`results/` are the original US snapshot, untouched.
+Swap `br_iv` for `br_long` and repeat. Artifacts land in `data/<market>/` and
+`results/<market>/`; root-level `data/` and `results/` are the original US snapshot,
+untouched. `python -m pytest tests/` runs the suite.
+
+If Yahoo is still rate-limiting, skip it with a CSV export — `Date,Open,High,Low,
+Close,Volume`, ISO or Brazilian `dd/mm/yyyy`, Portuguese headers accepted:
+
+```bash
+python code/01_collect_data.py --market br_long --equity-csv ~/Downloads/bvsp.csv
+```
+
+One open question remains: whether `^BVSP` volume is usable. Two features depend on
+it, and `01_collect_data.py` disables them automatically above a 1% bad-row rate —
+see [`data/br_long/PROVENANCE.md`](data/br_long/PROVENANCE.md).
 
 ## Two corrected defects
 

@@ -104,6 +104,41 @@ def load_cached(path: Path, label: str) -> pd.DataFrame | None:
     return None
 
 
+def _to_datetime(values) -> pd.DatetimeIndex:
+    """Parse a date column without mangling either ISO or Brazilian dates.
+
+    pandas' dayfirst=True turns 2020-01-02 into 1 February, and leaving it off
+    turns the Brazilian 02/01/2020 into 2 January. Neither default is safe on
+    its own, so decide from the actual format:
+
+      * ISO (yyyy-mm-dd) is unambiguous -- parse it directly.
+      * Slash-separated dates are decided by evidence: a leading component
+        above 12 proves day-first, a second component above 12 proves
+        month-first. If the whole column is ambiguous, assume day-first (the
+        Brazilian convention this pipeline needs) and say so.
+    """
+    text = pd.Series(values).astype(str).str.strip()
+
+    if text.str.match(r"^\d{4}-\d{1,2}-\d{1,2}").fillna(False).all():
+        return pd.to_datetime(text, errors="coerce")
+
+    slashed = text.str.extract(r"^(\d{1,2})[/.](\d{1,2})[/.](\d{2,4})")
+    if slashed[0].notna().any():
+        first = pd.to_numeric(slashed[0], errors="coerce")
+        second = pd.to_numeric(slashed[1], errors="coerce")
+        if (first > 12).any():
+            dayfirst = True
+        elif (second > 12).any():
+            dayfirst = False
+        else:
+            dayfirst = True
+            print("  NOTE: date column is ambiguous (no component above 12); "
+                  "assuming day-first (dd/mm/yyyy).")
+        return pd.to_datetime(text, errors="coerce", dayfirst=dayfirst)
+
+    return pd.to_datetime(text, errors="coerce")
+
+
 def _parse_iv_table(raw: pd.DataFrame, label: str) -> pd.DataFrame:
     """Normalise an implied-vol table to a single `close` column on a date index.
 
@@ -127,7 +162,7 @@ def _parse_iv_table(raw: pd.DataFrame, label: str) -> pd.DataFrame:
              if k in lower),
             raw.columns[0],
         )
-        idx = pd.to_datetime(raw[date_col], errors="coerce", dayfirst=True)
+        idx = _to_datetime(raw[date_col])
         rest = raw.drop(columns=[date_col])
 
     numeric = rest.apply(pd.to_numeric, errors="coerce")
@@ -178,6 +213,50 @@ def load_iv_url(url: str, cache: Path, retries: int = 4) -> pd.DataFrame:
         print(f"  IV fetch failed ({last_error}); falling back to {cache.name}")
 
     return _parse_iv_table(pd.read_csv(cache), cache.stem)
+
+
+def load_equity_csv(path: Path) -> pd.DataFrame:
+    """Load daily OHLCV from a CSV instead of Yahoo.
+
+    Escape hatch for when the Yahoo endpoint is unavailable -- it is rate
+    limited aggressively and is the only hard dependency left in the pipeline.
+    Accepts the standard Date/Open/High/Low/Close/Volume export served by
+    Yahoo's own download button, investing.com, or B3.
+    """
+    if not path.exists():
+        raise DataQualityError(f"equity CSV not found: {path}")
+
+    raw = pd.read_csv(path)
+    lower = {str(c).strip().lower(): c for c in raw.columns}
+    date_col = next(
+        (lower[k] for k in ("date", "data", "dt") if k in lower), raw.columns[0]
+    )
+    # Brazilian exports use Portuguese headers.
+    aliases = {
+        "abertura": "open", "maxima": "high", "máxima": "high",
+        "minima": "low", "mínima": "low", "fechamento": "close",
+        "ultimo": "close", "último": "close", "volume": "volume",
+        "vol.": "volume",
+    }
+    df = raw.rename(columns={
+        c: aliases.get(str(c).strip().lower(), str(c).strip().lower())
+        for c in raw.columns
+    })
+    df.index = _to_datetime(raw[date_col])
+    df = df[df.index.notna()].sort_index()
+    df.index.name = "date"
+
+    missing = {"open", "high", "low", "close"} - set(df.columns)
+    if missing:
+        raise DataQualityError(
+            f"{path.name} is missing required columns: {sorted(missing)}"
+        )
+    keep = [c for c in ("open", "high", "low", "close", "volume") if c in df.columns]
+    df = df[keep].apply(pd.to_numeric, errors="coerce").dropna(subset=["close"])
+
+    print(f"  {path.name}: {len(df):,} rows, "
+          f"{df.index[0].date()} to {df.index[-1].date()}")
+    return df
 
 
 def load_iv_csv(path: Path) -> pd.DataFrame:
@@ -360,6 +439,9 @@ def main() -> int:
     config.add_market_arg(ap)
     ap.add_argument("--use-cache", action="store_true",
                     help="reuse raw parquet files already on disk")
+    ap.add_argument("--equity-csv", type=Path, default=None,
+                    help="load daily OHLCV from this CSV instead of Yahoo "
+                         "(Date,Open,High,Low,Close[,Volume])")
     ap.add_argument("--legacy-quirks", action="store_true",
                     help="reproduce the original published panel exactly "
                          "(drops any row with a NaN in any column). Used only "
@@ -380,7 +462,11 @@ def main() -> int:
 
     px = load_cached(equity_path, cfg.equity_ticker) if args.use_cache else None
     if px is None:
-        px = download_yahoo(cfg.equity_ticker, cfg.start, cfg.end)
+        if args.equity_csv:
+            px = load_equity_csv(args.equity_csv)
+        else:
+            px = download_yahoo(cfg.equity_ticker, cfg.start, cfg.end)
+        px = px.loc[cfg.start:cfg.end]
         px.to_parquet(equity_path)
 
     iv = None

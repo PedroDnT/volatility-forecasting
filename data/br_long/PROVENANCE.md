@@ -35,9 +35,12 @@ August 2011.
 ```bash
 python code/00_probe_sources.py                 # needs network
 python code/01_collect_data.py --market br_long
+
+# or, if Yahoo is rate-limiting, from a CSV export instead:
+python code/01_collect_data.py --market br_long --equity-csv path/to/bvsp.csv
 ```
 
-Blocked only on Yahoo access — nothing else is outstanding for this arm.
+Blocked only on obtaining `^BVSP` — nothing else is outstanding for this arm.
 
 ## Open question — record findings here
 
