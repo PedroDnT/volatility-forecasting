@@ -1,0 +1,46 @@
+{
+  "_comment": [
+    "Published claims from Khan (2026), SSRN 6663418, as printed in the paper",
+    "and README. These were hard-coded in the original code/06_audit.py; they",
+    "live here instead so one generic audit can serve every market.",
+    "",
+    "Audit the legacy root-level snapshot against them with:",
+    "  python code/06_audit.py --market us --results-dir results \\",
+    "      --expected results/expected_paper.json",
+    "",
+    "These values describe the ORIGINAL pipeline, which validated on a window",
+    "nested inside its training set and scored a one-day in-sample GARCH",
+    "filter against a five-day forward target. The corrected pipeline in",
+    "results/us/ does not reproduce them and is not meant to."
+  ],
+  "market": "us_published",
+  "full_sample": {
+    "GARCH": {"QLIKE": 0.3806},
+    "EGARCH": {"QLIKE": 0.3748},
+    "GJR-GARCH": {"QLIKE": 0.3447, "RMSE": 0.0734, "MZ_R2": 0.3802},
+    "HAR-RV": {"QLIKE": 0.4198},
+    "LightGBM": {"QLIKE": 0.3632},
+    "XGBoost": {"QLIKE": 0.3553, "MAE": 0.0470},
+    "Ensemble": {"QLIKE": 0.3431}
+  },
+  "by_year": {
+    "2022_high_vol": {
+      "EGARCH": 0.2346,
+      "GARCH": 0.2579,
+      "GJR-GARCH": 0.2597,
+      "Ensemble": 0.2616,
+      "HAR-RV": 0.3123,
+      "XGBoost": 0.3148,
+      "LightGBM": 0.3429
+    },
+    "after_2022_lower_vol": {
+      "XGBoost": 0.3693,
+      "LightGBM": 0.3702,
+      "Ensemble": 0.3712,
+      "GJR-GARCH": 0.3740,
+      "GARCH": 0.4228,
+      "EGARCH": 0.4230,
+      "HAR-RV": 0.4568
+    }
+  }
+}

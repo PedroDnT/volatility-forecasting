@@ -1,0 +1,68 @@
+{
+  "split_year": 2020,
+  "full_sample": {
+    "GARCH": {
+      "QLIKE": 0.542962,
+      "RMSE": 0.101014,
+      "MAE": 0.063852,
+      "MZ_R2": 0.509002
+    },
+    "EGARCH": {
+      "QLIKE": 0.5723,
+      "RMSE": 0.102691,
+      "MAE": 0.066081,
+      "MZ_R2": 0.492901
+    },
+    "GJR-GARCH": {
+      "QLIKE": 0.562533,
+      "RMSE": 0.097783,
+      "MAE": 0.060427,
+      "MZ_R2": 0.550287
+    },
+    "HAR-RV": {
+      "QLIKE": 0.760565,
+      "RMSE": 0.106426,
+      "MAE": 0.063634,
+      "MZ_R2": 0.452696
+    },
+    "LightGBM": {
+      "QLIKE": 0.498981,
+      "RMSE": 0.091842,
+      "MAE": 0.056629,
+      "MZ_R2": 0.595531
+    },
+    "XGBoost": {
+      "QLIKE": 0.497551,
+      "RMSE": 0.091123,
+      "MAE": 0.056508,
+      "MZ_R2": 0.603177
+    },
+    "Ensemble": {
+      "QLIKE": 0.5327,
+      "RMSE": 0.096763,
+      "MAE": 0.058654,
+      "MZ_R2": 0.54206
+    }
+  },
+  "by_year": {
+    "2020_high_vol": {
+      "GARCH": 0.687623,
+      "EGARCH": 0.694149,
+      "GJR-GARCH": 0.908315,
+      "HAR-RV": 1.076278,
+      "LightGBM": 0.640401,
+      "XGBoost": 0.649752,
+      "Ensemble": 0.719384
+    },
+    "other_years": {
+      "GARCH": 0.499236,
+      "EGARCH": 0.535468,
+      "GJR-GARCH": 0.458013,
+      "HAR-RV": 0.665135,
+      "LightGBM": 0.456234,
+      "XGBoost": 0.451545,
+      "Ensemble": 0.476272
+    }
+  },
+  "market": "us_2018"
+}
