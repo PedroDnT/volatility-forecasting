@@ -1,0 +1,6 @@
+interface:
+  display_name: "Volatility Forecasting"
+  short_description: "Repo-specific patterns and workflows for volatility-forecasting"
+  default_prompt: "Use the volatility-forecasting repo skill to follow existing architecture, testing, and workflow conventions."
+policy:
+  allow_implicit_invocation: true
