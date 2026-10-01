@@ -89,11 +89,13 @@ from 1st to 4th — its two weak members drag it down once the individual models
 fixed. HAR-RV is the only model that does not improve, the expected control since
 neither defect touched it.
 
-**The subperiod reversal dissolves, then reappears with the opposite sign.** On
-2022–2025, corrected GJR-GARCH wins *both* subperiods, so "the winner flips with the
-regime" does not hold. On 2018–2022 the trees win outright and GJR-GARCH is 5th.
-Which family wins depends on the evaluation window, not on the volatility regime
-within it. Worth settling before drawing conclusions from the Brazilian arms.
+**The year-based reversal does not hold.** On 2022–2025, a GARCH-family model wins
+both calendar subperiods (EGARCH in 2022, GJR-GARCH in 2023–2025), so "the winner
+flips with the regime" does not survive as the paper states it. On 2018–2022 the
+trees win outright and GJR-GARCH is 5th. Split by realized-volatility regime instead,
+GARCH-family models lead in high volatility and the trees in lower volatility, so the
+ranking depends on both the evaluation window and how regimes are cut. Worth settling
+before drawing conclusions from the Brazilian arms.
 
 Joint tests agree the field is not separable: the 95% MCS eliminates only HAR-RV on
 both windows, and GJR-GARCH's edge over the trees on `us` is insignificant
